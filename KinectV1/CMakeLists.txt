@@ -37,7 +37,8 @@ find_package( OpenCV )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 set(src 
-		src/main.cpp
+		main.cpp
+        KinectV1Sensor.cpp
 		)
 		
 add_executable( KinectV1Module ${src} )

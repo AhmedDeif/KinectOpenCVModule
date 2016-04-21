@@ -1,199 +1,27 @@
-#pragma once
-#include <Windows.h>
-#include <NuiApi.h>
-#include <iostream>
-#include <opencv2/opencv.hpp>
-
-HANDLE                  colorStream = (INVALID_HANDLE_VALUE);
-HANDLE                  m_hNextColorFrameEvent = (INVALID_HANDLE_VALUE);
-
-HANDLE					depthStream = (INVALID_HANDLE_VALUE);
-HANDLE					m_hNextDepthFrameEvent = (INVALID_HANDLE_VALUE);
-
-INuiSensor*             sensor;
-
-const int eventCount = 1;
-HANDLE hEvents[eventCount];
-
-
-using namespace cv;
-
-
-/// <summary>
-/// Obtains depth frame data from kinect and transfer it to opencv mat then display opencv mat.
-/// </summary>
-/// <returns>void</returns>
-void getDepthFrame()
-{
-	NUI_IMAGE_FRAME imageFrame;
-	NUI_LOCKED_RECT lockedRect;
-	if (sensor->NuiImageStreamGetNextFrame(depthStream, 0, &imageFrame) < 0) { return; }
-	INuiFrameTexture* texture = imageFrame.pFrameTexture;
-	texture->LockRect(0, &lockedRect, NULL, 0);
-
-	// Copy image information into Mat. Each pixel in depth frame obtained by kinect is
-	//	represented by 1 USHORT, 16 bits wide grayscale.
-	if (lockedRect.Pitch != 0)
-	{
-		Mat test = Mat(480, 640, CV_16U);
-		BYTE* upperLeftCorner = (BYTE*)lockedRect.pBits;
-		BYTE* pointerToTheByteBeingRead = upperLeftCorner;
-		BYTE* pBuffer = lockedRect.pBits;
-		BYTE* m_pDepthBuffer = new BYTE[lockedRect.size];
-		USHORT* pBufferRun = reinterpret_cast<USHORT*>(m_pDepthBuffer);
-		memcpy_s(m_pDepthBuffer, lockedRect.size, pBuffer, lockedRect.size);
-		for (UINT y = 0; y < 480; ++y)
-		{
-			// Get row pointer for depth Mat
-			USHORT* pDepthRow = test.ptr<USHORT>(y);
-			for (UINT x = 0; x < 640; ++x)
-			{
-				pDepthRow[x] = pBufferRun[y * 640 + x];
-			}
-		}
-		imshow("DepthStream", test);
-		waitKey(1);
-	}
-	texture->UnlockRect(0);
-	// Release stream so it can be updated.
-	sensor->NuiImageStreamReleaseFrame(depthStream, &imageFrame);
-}
-
-/// <summary>
-/// Obtains RGAB frame data from kinect and transfer it to opencv mat then display opencv mat.
-/// </summary>
-/// <returns>indicates success or failure</returns>
-void getRGBFrame() {
-
-	//	Frame to hold RGAB data returened from kinect sensor.
-	NUI_IMAGE_FRAME imageFrame;
-	NUI_LOCKED_RECT lockedRect;
-
-	if (sensor->NuiImageStreamGetNextFrame(colorStream, 0, &imageFrame) < 0) { return; }
-
-	INuiFrameTexture* texture = imageFrame.pFrameTexture;
-	//	must lock texture to prevent updaing of image before copy is complete.
-	texture->LockRect(0, &lockedRect, NULL, 0);
-
-	//	If pitch  == 0 then its an empty frame.
-	if (lockedRect.Pitch != 0)
-	{
-		//	No need to display apha channels so mat type CV_8UC3.
-		Mat test = Mat(480, 640, CV_8UC3);
-		BYTE* upperLeftCorner = (BYTE*)lockedRect.pBits;
-		BYTE* pointerToTheByteBeingRead = upperLeftCorner;
-
-		// copy bytes from locked texture to opencv mat channels.
-		for (int i = 0; i < 480; i++)
-		{
-			Vec3b *pointerToRow = test.ptr<Vec3b>(i);
-			for (int j = 0; j < 640; j++)
-			{
-				unsigned char r = *pointerToTheByteBeingRead;
-				pointerToTheByteBeingRead += 1;
-				unsigned char g = *pointerToTheByteBeingRead;
-				pointerToTheByteBeingRead += 1;
-				unsigned char b = *pointerToTheByteBeingRead;
-				pointerToTheByteBeingRead += 2; //So to skip the alpha channel
-				pointerToRow[j] = Vec3b(r, g, b);
-			}
-		}
-		imshow("ColorStream", test);
-		waitKey(1);
-	}
-	texture->UnlockRect(0);
-	// Release stream so it can be updated.
-	sensor->NuiImageStreamReleaseFrame(colorStream, &imageFrame);
-	
-}
-
-/// <summary>
-/// Create the first connected Kinect found 
-/// </summary>
-/// <returns>indicates success or failure</returns>
-HRESULT CreateFirstConnected()
-{
-	INuiSensor * pNuiSensor;
-	HRESULT hr;
-
-	int iSensorCount = 0;
-	//	Gets the number of kinect devices connected.
-	hr = NuiGetSensorCount(&iSensorCount);
-	if (FAILED(hr))
-	{
-		return hr;
-	}
-
-	// Look at each Kinect sensor
-	for (int i = 0; i < iSensorCount; ++i)
-	{
-		// Create the sensor so we can check status, if we can't create it, move on to the next
-		hr = NuiCreateSensorByIndex(i, &pNuiSensor);
-		if (FAILED(hr))
-		{
-			continue;
-		}
-
-		// Get the status of the sensor, and if connected, then we can initialize it
-		hr = pNuiSensor->NuiStatus();
-		if (S_OK == hr)
-		{
-			sensor = pNuiSensor;
-			break;
-		}
-
-		// This sensor wasn't OK, so release it since we're not using it
-		pNuiSensor->Release();
-	}
-
-	if (NULL != sensor)
-	{
-		// Initialize the Kinect and specify that we'll be using color and depth.
-		hr = sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_DEPTH | NUI_INITIALIZE_FLAG_USES_COLOR);
-		if (SUCCEEDED(hr))
-		{
-			// Create an event that will be signaled when color data is available.
-			m_hNextColorFrameEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-			// Open a color image stream to receive color frames.
-			hr = sensor->NuiImageStreamOpen(
-				NUI_IMAGE_TYPE_COLOR,
-				NUI_IMAGE_RESOLUTION_640x480,
-				0,
-				2,	//	frame limit should be set to 2 as states my Microsoft docs.
-				m_hNextColorFrameEvent,
-				&colorStream);
-			
-			// Create an event that will be signaled when depth data is available.
-			m_hNextDepthFrameEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-			//	Open a depth stream to receive depth frames.
-			hr = sensor->NuiImageStreamOpen(
-				NUI_IMAGE_TYPE_DEPTH,
-				NUI_IMAGE_RESOLUTION_640x480,
-				0,
-				2,	//	frame limit should be set to 2 as states my Microsoft docs.
-				m_hNextDepthFrameEvent,
-				&depthStream);
-		}
-	}
-	return hr;
-}
+#include "KinectV1Sensor.cpp"
 
 int main()
 {
-	CreateFirstConnected();
-	hEvents[0] = colorStream;
-	while (1)
+	KinectV1Sensor kinectSensor = KinectV1Sensor();
+	if(SUCCEEDED(kinectSensor.CreateFirstConnected()))
 	{
-		MsgWaitForMultipleObjects(eventCount, hEvents, FALSE, INFINITE, QS_ALLINPUT);
-		if (WAIT_OBJECT_0 == WaitForSingleObject(m_hNextColorFrameEvent, 0))
+		Mat color = Mat(480, 640, CV_8UC3);
+		Mat depth = Mat(480, 640, CV_16U);
+
+		while (1)
 		{
-			getRGBFrame();
+			MsgWaitForMultipleObjects(kinectSensor.eventCount, kinectSensor.hEvents, FALSE, INFINITE, QS_ALLINPUT);
+			if (WAIT_OBJECT_0 == WaitForSingleObject(kinectSensor.m_hNextColorFrameEvent, 0))
+			{
+				kinectSensor.getRGBFrame(color);
+			}
+			if (WAIT_OBJECT_0 == WaitForSingleObject(kinectSensor.m_hNextDepthFrameEvent, 0))
+			{
+				kinectSensor.getDepthFrame(depth);
+			}
+			imshow("ColorStream", color);
+			imshow("DepthStream", depth);
 		}
-		if (WAIT_OBJECT_0 == WaitForSingleObject(m_hNextDepthFrameEvent, 0))
-		{
-			getDepthFrame();
-		}
+
 	}
 }
