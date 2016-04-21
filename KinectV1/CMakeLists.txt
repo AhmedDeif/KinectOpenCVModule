@@ -36,12 +36,10 @@ find_package( OpenCV )
 
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
-INCLUDE_DIRECTORIES( ${OPENNI2_INCLUDE_DIR} ${NITE2_INCLUDE_DIR} )
-
 set(src 
 		src/main.cpp
 		)
 		
-add_executable( KinectModule ${src} )
+add_executable( KinectV1Module ${src} )
 
-target_link_libraries( KinectModule ${OpenCV_LIBS} ${KinectSDK18_LIBRARIES})
+target_link_libraries( KinectV1Module ${OpenCV_LIBS} ${KinectSDK18_LIBRARIES})
