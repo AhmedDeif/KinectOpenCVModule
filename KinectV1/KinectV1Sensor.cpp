@@ -127,7 +127,7 @@ class KinectV1Sensor
     /// <returns>indicates success or failure</returns>
     void getRGBFrame(cv::Mat* test)
     {
-		test->release();
+		//test->release();
         
         //    Frame to hold RGAB data returened from kinect sensor.
         NUI_IMAGE_FRAME imageFrame;
@@ -192,7 +192,7 @@ class KinectV1Sensor
     void getDepthFrame(cv::Mat* test)
     
     {
-		test->release();
+		//test->release();
         NUI_IMAGE_FRAME imageFrame;
         NUI_LOCKED_RECT lockedRect;
         if (sensor->NuiImageStreamGetNextFrame(depthStream, 0, &imageFrame) < 0)
