@@ -222,8 +222,6 @@ public:
 					pDepthRow[x] = pBufferRun[y * 640 + x];
 
 				}
-
-
 			}
 		}
 
