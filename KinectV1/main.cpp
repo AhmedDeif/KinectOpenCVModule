@@ -13,14 +13,16 @@ int main()
 			MsgWaitForMultipleObjects(kinectSensor.eventCount, kinectSensor.hEvents, FALSE, INFINITE, QS_ALLINPUT);
 			if (WAIT_OBJECT_0 == WaitForSingleObject(kinectSensor.m_hNextColorFrameEvent, 0))
 			{
-				kinectSensor.getRGBFrame(color);
+				kinectSensor.getRGBFrame(&color);
+
 			}
 			if (WAIT_OBJECT_0 == WaitForSingleObject(kinectSensor.m_hNextDepthFrameEvent, 0))
 			{
-				kinectSensor.getDepthFrame(depth);
+				kinectSensor.getDepthFrame(&depth);
 			}
 			imshow("ColorStream", color);
 			imshow("DepthStream", depth);
+			waitKey(1);
 		}
 
 	}

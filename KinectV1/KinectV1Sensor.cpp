@@ -18,7 +18,7 @@ class KinectV1Sensor
     
     INuiSensor* sensor;
     
-    const int eventCount = 1;
+    static const int eventCount = 1;
     HANDLE hEvents[eventCount];
     
     
@@ -125,9 +125,9 @@ class KinectV1Sensor
     /// Obtains RGAB frame data from kinect and transfer it to opencv mat then display opencv mat.
     /// </summary>
     /// <returns>indicates success or failure</returns>
-    void getRGBFrame(const cv::Mat& test)
+    void getRGBFrame(cv::Mat* test)
     {
-        
+		
         
         //    Frame to hold RGAB data returened from kinect sensor.
         NUI_IMAGE_FRAME imageFrame;
@@ -154,7 +154,8 @@ class KinectV1Sensor
             
             {
                 
-                Vec3b *pointerToRow = test.ptr<Vec3b>(i);
+
+                Vec3b *pointerToRow = &(*test->ptr<Vec3b>(i));
                 for (int j = 0; j < 640; j++)
                 
                 {
@@ -172,16 +173,14 @@ class KinectV1Sensor
                 
             }
             
-            imshow("ColorStream", test);
-            waitKey(1);
+            //imshow("ColorStream", test);
+           // waitKey(1);
             
         }
         
         texture->UnlockRect(0);
         // Release stream so it can be updated.
         sensor->NuiImageStreamReleaseFrame(colorStream, &imageFrame);
-        
-        
     }
     
     
@@ -190,7 +189,7 @@ class KinectV1Sensor
     /// Obtains depth frame data from kinect and transfer it to opencv mat then display opencv mat.
     /// </summary>
     /// <returns>void</returns>
-    void getDepthFrame(const cv::Mat& test)
+    void getDepthFrame(cv::Mat* test)
     
     {
         
@@ -221,7 +220,7 @@ class KinectV1Sensor
             {
                 
                 // Get row pointer for depth Mat
-                USHORT* pDepthRow = test.ptr<USHORT>(y);
+                USHORT* pDepthRow = &(*test->ptr<USHORT>(y));
                 for (UINT x = 0; x < 640; ++x)
                 
                 {
@@ -231,11 +230,7 @@ class KinectV1Sensor
                 }
                 
                 
-            }
-            
-            imshow("DepthStream", test);
-            waitKey(1);
-            
+            }      
         }
         
         texture->UnlockRect(0);
@@ -243,6 +238,6 @@ class KinectV1Sensor
         sensor->NuiImageStreamReleaseFrame(depthStream, &imageFrame);
         
     }
-
+	
 
 };
